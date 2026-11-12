@@ -29,13 +29,13 @@ public class CellBehaviour : NetworkBehaviour {
         defaultLightState = lightState;
         UpdateWalls();
         
-        Plugin.Instance.logger.LogInfo($"Initializing cell ceiling has {CeilingMR.materials.Length} materials");
+        Plugin.Instance.logger.LogDebug($"Initializing cell ceiling has {CeilingMR.materials.Length} materials");
         lightOnMat = CeilingMR.materials[0]; 
         ceilingMat = CeilingMR.materials[1];
         lightOffMat = CeilingMR.materials[2];
         if(!hasLightSource)
         {
-            Plugin.Instance.logger.LogWarning($"Cell {cell.position} initialized with light source disabled.");
+            Plugin.Instance.logger.LogDebug($"Cell {cell.position} initialized with light source disabled.");
             LightObject.SetActive(false);
             CeilingMR.SetMaterials([ceilingMat, ceilingMat]);
         }
@@ -87,7 +87,6 @@ public class CellBehaviour : NetworkBehaviour {
     {
         if (!cellLightSource || !hasLightSource) return;
         StartCoroutine(TwinkleCoroutine(intensityCurve, duration));
-        Plugin.Instance.logger.LogInfo($"Twinkle started for duration:{duration} seconds");
     }
 
     private IEnumerator TwinkleCoroutine(AnimationCurve intensityCurve, float duration)
