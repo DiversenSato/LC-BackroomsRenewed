@@ -3,25 +3,37 @@ namespace VELDDev.BackroomsRenewed.Patches;
 [HarmonyPatch(typeof(ShipTeleporter))]
 public class ShipTeleporter_Patches
 {
+    /// <summary>
+    /// beamUpPlayer is a coroutine, so a plain postfix runs when the beam *starts* and vanilla still pulls
+    /// the player onto the ship ~3s later. Wrap the enumerator and only act once vanilla is done.
+    /// </summary>
     [HarmonyPostfix, HarmonyPatch(nameof(ShipTeleporter.beamUpPlayer))]
-    public static void BeamUpPlayerToBackrooms(ShipTeleporter __instance)
+    public static IEnumerator BeamUpPlayerToBackrooms(IEnumerator __result, ShipTeleporter __instance)
     {
-        
+        // Captured on the same frame vanilla captures it; the radar target may change during the beam.
+        var teleportedPlayer = StartOfRound.Instance.mapScreen.targetedPlayer;
+        var redirectedToEnemy = teleportedPlayer != null && teleportedPlayer.redirectToEnemy != null;
+
+        while (__result.MoveNext())
+            yield return __result.Current;
+
         // Only handle regular teleporter, not inverse
         if (__instance.isInverseTeleporter)
-            return;
+            yield break;
 
-        if (!SyncedConfig.Instance.TeleportOnShipTP)
-            return;
+        if (!SyncedConfig.Instance.TeleportOnShipTP || !Backrooms.Instance)
+            yield break;
 
-        // Get the player that was just teleported
-        // beamUpPlayer targets the player that was being tracked by the radar
-        var teleportedPlayer = StartOfRound.Instance.mapScreen.targetedPlayer;
-        if (teleportedPlayer == null)
-            return;
+        // beamUpPlayer runs on every client: only the teleported player's own client rolls,
+        // otherwise each client rolls separately and sends its own teleport request.
+        if (teleportedPlayer == null || teleportedPlayer != GameNetworkManager.Instance.localPlayerController)
+            yield break;
+
+        if (redirectedToEnemy || teleportedPlayer.isPlayerDead)
+            yield break;
 
         if (Backrooms.Instance.PlayersInBackrooms.Contains(teleportedPlayer.playerClientId))
-            return;
+            yield break;
 
         bool sendToTheBackrooms = CheckTeleportChance(
             teleportedPlayer,
@@ -46,7 +58,11 @@ public class ShipTeleporter_Patches
             return;
 
         var teleportedPlayer = StartOfRound.Instance.allPlayerScripts[playerObj];
-        if (teleportedPlayer == null)
+        if (teleportedPlayer == null || !Backrooms.Instance)
+            return;
+
+        // Runs on every client: only the teleported player's own client rolls.
+        if (teleportedPlayer != GameNetworkManager.Instance.localPlayerController)
             return;
 
         bool sendToTheBackrooms = CheckTeleportChance(

@@ -125,28 +125,49 @@ public class Backrooms : NetworkBehaviour
     {
         if (IsServer)
         {
-            // Server picks the position and broadcasts to all clients
-            var randomPos = PickRandomPosOnNavmesh();
-            var targetPos = randomPos ?? GetFallbackPosition();
-
-            if (!randomPos.HasValue)
-            {
-                Logger.LogWarning("Failed to find valid NavMesh position, using fallback center position");
-            }
-
-            // NetworkList can only be mutated on the server.
-            if (!PlayersInBackrooms.Contains(targetPlayer.playerClientId))
-            {
-                PlayersInBackrooms.Add(targetPlayer.playerClientId);
-            }
-
-            TeleportPlayerClientRpc(targetPlayer.playerClientId, targetPos, dropItems);
+            ServerTeleportPlayer(targetPlayer.playerClientId, dropItems);
         }
         else
         {
             // Client requests teleportation from server
             RequestTeleportServerRpc(targetPlayer.playerClientId, dropItems);
         }
+    }
+
+    /// <summary>
+    /// Server-side: picks a floor position inside the maze and broadcasts the teleport.
+    /// If the maze isn't generated yet, waits for it instead of dropping the player into the void.
+    /// </summary>
+    private void ServerTeleportPlayer(ulong playerClientId, bool dropItems)
+    {
+        if (!IsGenerated.Value)
+        {
+            Logger.LogInfo($"Backrooms not generated yet, delaying teleport of player {playerClientId}");
+            StartCoroutine(TeleportWhenGenerated(playerClientId, dropItems));
+            return;
+        }
+
+        var randomPos = PickRandomPosOnNavmesh();
+        var targetPos = randomPos ?? GetFallbackPosition();
+
+        if (!randomPos.HasValue)
+        {
+            Logger.LogWarning("Failed to find valid NavMesh position, using fallback cell position");
+        }
+
+        // NetworkList can only be mutated on the server.
+        if (!PlayersInBackrooms.Contains(playerClientId))
+        {
+            PlayersInBackrooms.Add(playerClientId);
+        }
+
+        TeleportPlayerClientRpc(playerClientId, targetPos, dropItems);
+    }
+
+    private IEnumerator TeleportWhenGenerated(ulong playerClientId, bool dropItems)
+    {
+        yield return new WaitUntil(() => IsGenerated.Value);
+        ServerTeleportPlayer(playerClientId, dropItems);
     }
 
     /// <summary>
@@ -164,21 +185,7 @@ public class Backrooms : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestTeleportServerRpc(ulong playerClientId, bool dropItems)
     {
-        var randomPos = PickRandomPosOnNavmesh();
-        var targetPos = randomPos ?? GetFallbackPosition();
-
-        if (!randomPos.HasValue)
-        {
-            Logger.LogWarning("Failed to find valid NavMesh position, using fallback center position");
-        }
-
-        // NetworkList can only be mutated on the server.
-        if (!PlayersInBackrooms.Contains(playerClientId))
-        {
-            PlayersInBackrooms.Add(playerClientId);
-        }
-
-        TeleportPlayerClientRpc(playerClientId, targetPos, dropItems);
+        ServerTeleportPlayer(playerClientId, dropItems);
     }
 
     /// <summary>
@@ -249,23 +256,24 @@ public class Backrooms : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Used when the navmesh isn't usable (e.g. still being built). Every cell has a floor at its pivot,
+    /// so the center of a random cell is always a valid landing spot.
+    /// </summary>
     private Vector3 GetFallbackPosition()
     {
-        // Anchor to where the cells actually are, and try to snap to the navmesh at the grid center.
-        // Fallback still lands on a real floor instead of the void.
-        var origin = CellsHolder != null ? CellsHolder.position : transform.position;
-        var center = new Vector3(
-            origin.x + (generator.width * CELL_SIZE) / 2f,
-            origin.y,
-            origin.z + (generator.height * CELL_SIZE) / 2f
-        );
-
-        if (NavMesh.SamplePosition(center, out NavMeshHit hit, generator.width * CELL_SIZE, NavMesh.AllAreas))
+        if (Cells != null)
         {
-            return hit.position;
+            for (int i = 0; i < 10; i++)
+            {
+                var cell = Cells[Random.Range(0, Cells.GetLength(0)), Random.Range(0, Cells.GetLength(1))];
+                if (cell)
+                    return cell.transform.position;
+            }
         }
 
-        return new Vector3(origin.x, origin.y + 2f, origin.z);
+        // Cell (0, 0) sits at the holder's origin.
+        return CellsHolder != null ? CellsHolder.position : transform.position;
     }
 
     private PlayerControllerB GetPlayerByClientId(ulong clientId)
@@ -282,26 +290,30 @@ public class Backrooms : NetworkBehaviour
 
     private Vector3? PickRandomPosOnNavmesh(int maxAttempts = 30)
     {
-        // Calculate the bounds of the backrooms
-        var origin = CellsHolder != null ? CellsHolder.position : transform.position;
+        if (Cells == null)
+            return null;
 
-        float minX = origin.x;
-        float maxX = origin.x + generator.width * CELL_SIZE;
-        float minZ = origin.z;
-        float maxZ = origin.z + generator.height * CELL_SIZE;
-        float y = origin.y; // Backrooms floor level (world space)
+        // Cell pivots are at the center of their floor, so pick a random cell and a point inside it
+        // (away from the walls). Picking from the grid's raw bounds would land half a cell outside the maze.
+        const float INSET = CELL_SIZE / 2f - 1.5f;
+        const float SAMPLE_RADIUS = 4f;
+        const float MAX_FLOOR_HEIGHT_DELTA = 1f;
+
+        int width = Cells.GetLength(0);
+        int length = Cells.GetLength(1);
 
         for(int i = 0; i < maxAttempts; i++)
         {
-            // Pick a random point within the backrooms bounds
-            var randomPoint = new Vector3(
-                Random.Range(minX, maxX),
-                y,
-                Random.Range(minZ, maxZ)
-            );
+            var cell = Cells[Random.Range(0, width), Random.Range(0, length)];
+            if (!cell)
+                continue;
 
-            // Try to find the nearest point on the NavMesh
-            if(NavMesh.SamplePosition(randomPoint, out NavMeshHit hit, CELL_SIZE, NavMesh.AllAreas))
+            var floor = cell.transform.position;
+            var randomPoint = floor + new Vector3(Random.Range(-INSET, INSET), 0f, Random.Range(-INSET, INSET));
+
+            // Only accept navmesh at floor height, never anything on top of the maze.
+            if(NavMesh.SamplePosition(randomPoint, out NavMeshHit hit, SAMPLE_RADIUS, NavMesh.AllAreas)
+               && Mathf.Abs(hit.position.y - floor.y) <= MAX_FLOOR_HEIGHT_DELTA)
             {
                 return hit.position;
             }
@@ -484,11 +496,12 @@ public class Backrooms : NetworkBehaviour
         generator.height = length;
 
         // Set anti-light leak cover location and size
-        var backroomsCenter = new Vector3((width * CELL_SIZE) / 2f, 10f, (length * CELL_SIZE) / 2f);
-        BackroomsLightCover.transform.localPosition = backroomsCenter;
+        BackroomsLightCover.transform.localPosition = GridLocalCenter(width, length, 10f);
         BackroomsLightCover.transform.localScale = new Vector3(width, 1f, length) * 1.5f;
         Logger.LogInfo("Set backrooms light cover");
-        
+
+        ConfigureNavMeshVolume(width, length);
+
         // Navmesh may be baked in the future by making one navmesh surface for each cell
         // and adding navmesh links between cells
         if (SyncedConfig.Instance.LegacyNavMeshGen)
@@ -509,11 +522,29 @@ public class Backrooms : NetworkBehaviour
         // More research to be done for this smh
     }
 
+    /// <summary>
+    /// Center of the cell grid in CellsHolder-local space. Cell pivots are at their floor's center,
+    /// so the grid spans [-CELL_SIZE/2, (n - 0.5) * CELL_SIZE] on each axis.
+    /// </summary>
+    private static Vector3 GridLocalCenter(int width, int length, float y) =>
+        new(((width - 1) * CELL_SIZE) / 2f, y, ((length - 1) * CELL_SIZE) / 2f);
+
+    /// <summary>
+    /// Restrict the navmesh bake to the maze itself, from just under the floor to just below the ceiling.
+    /// Collecting "All" objects baked walkable navmesh on the cell roofs, the light cover, and the whole moon.
+    /// </summary>
+    private void ConfigureNavMeshVolume(int width, int length)
+    {
+        const float NAVMESH_MIN_Y = -1f;
+        const float NAVMESH_MAX_Y = 7f; // ceilings sit at y = 8
+
+        BackroomsNavMesh.collectObjects = CollectObjects.Volume;
+        BackroomsNavMesh.center = GridLocalCenter(width, length, (NAVMESH_MIN_Y + NAVMESH_MAX_Y) / 2f);
+        BackroomsNavMesh.size = new Vector3(width * CELL_SIZE + 2f, NAVMESH_MAX_Y - NAVMESH_MIN_Y, length * CELL_SIZE + 2f);
+    }
+
     private IEnumerator RefreshNavmeshesAsync()
     {
-        var backroomsCenter = new Vector3((generator.width * CELL_SIZE) / 2f, 0, (generator.height * CELL_SIZE) / 2f);
-        BackroomsNavMesh.center = backroomsCenter;
-        BackroomsNavMesh.size = new Vector3(generator.width * CELL_SIZE, 1f, generator.height * CELL_SIZE);
         BackroomsNavMesh.navMeshData = new NavMeshData();
         BackroomsNavMesh.AddData();
         yield return BackroomsNavMesh.UpdateNavMesh(BackroomsNavMesh.navMeshData);
