@@ -514,10 +514,7 @@ public class Backrooms : NetworkBehaviour
         else
         {
             Logger.LogInfo("Refreshing Navmesh...");
-            var sw = Stopwatch.StartNew();
             StartCoroutine(RefreshNavmeshesAsync());
-            sw.Stop();
-            Logger.LogInfo($"Navmesh refreshed in {sw.ElapsedMilliseconds:N0}ms");
         }
         // More research to be done for this smh
     }
@@ -545,9 +542,21 @@ public class Backrooms : NetworkBehaviour
 
     private IEnumerator RefreshNavmeshesAsync()
     {
-        BackroomsNavMesh.navMeshData = new NavMeshData();
+        // The bake bounds are local to the surface, so the data must sit at the surface's transform.
+        // A bare `new NavMeshData()` sits at the world origin, and the bake then misses the backrooms entirely.
+        var surfaceTransform = BackroomsNavMesh.transform;
+        BackroomsNavMesh.RemoveData();
+        BackroomsNavMesh.navMeshData = new NavMeshData(BackroomsNavMesh.agentTypeID)
+        {
+            position = surfaceTransform.position,
+            rotation = surfaceTransform.rotation
+        };
         BackroomsNavMesh.AddData();
+
+        var sw = Stopwatch.StartNew();
         yield return BackroomsNavMesh.UpdateNavMesh(BackroomsNavMesh.navMeshData);
+        sw.Stop();
+        Logger.LogInfo($"Navmesh baked in {sw.ElapsedMilliseconds:N0}ms");
     }
     
     public override void OnDestroy()
