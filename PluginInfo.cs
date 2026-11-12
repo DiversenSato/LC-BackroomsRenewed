@@ -13,8 +13,11 @@ namespace VELDDev.BackroomsRenewed;
 
 public static class PluginInfo
 {
-    public const string PluginName = "Backrooms Renewed";
-    public const string GUID = "VELDDev.BackroomsRenewed";
-    public const string Author = "VELD-Dev";
-    public const string Version = "0.1.5";
+    public const string PluginName = "Backrooms Renewed Fixed";
+    public const string GUID = "DiversenSato.BackroomsRenewedFixed";
+    public const string Author = "DiversenSato (fork of VELD-Dev's Backrooms Renewed)";
+
+    /// <summary>GUID of the original mod this fork is based on; both can't run at once.</summary>
+    public const string OriginalGUID = "VELDDev.BackroomsRenewed";
+    public const string Version = "0.1.6";
 }

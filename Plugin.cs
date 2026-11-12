@@ -4,6 +4,8 @@ using Unity.XR.CoreUtils;
 namespace VELDDev.BackroomsRenewed;
 
 [BepInPlugin(PluginInfo.GUID, PluginInfo.PluginName, PluginInfo.Version)]
+// Same network prefabs and Harmony patches as the original: running both would break.
+[BepInIncompatibility(PluginInfo.OriginalGUID)]
 public class Plugin : BaseUnityPlugin
 {
     private Harmony harmony = new Harmony(PluginInfo.GUID);

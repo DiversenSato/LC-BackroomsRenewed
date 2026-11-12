@@ -12,19 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: -303672662, guid: 7b498aef2f33e69c2a88e5e7065423a3, type: 3}
   m_Name: ModInfo_BackroomsRenewed
   m_EditorClassIdentifier: 
-  <AuthorName>k__BackingField: VELD-Dev
-  <ModName>k__BackingField: Backrooms Renewed
-  <Version>k__BackingField: 0.1.0
+  <AuthorName>k__BackingField: DiversenSato
+  <ModName>k__BackingField: Backrooms Renewed Fixed
+  <Version>k__BackingField: 0.1.6
   <READMEFile>k__BackingField: {fileID: 4900000, guid: 17eab98d1b066cc7787b52fda86056b6,
     type: 3}
   <ChangelogFile>k__BackingField: {fileID: 4900000, guid: c97cc7fe76ffae6a5af48ea8dc467faa,
     type: 3}
   <ModDescription>k__BackingField: 
   <ExtraDependencies>k__BackingField:
-  - BepInEx-BepInExPack-5.4.2304
+  - BepInEx-BepInExPack-5.4.2305
   - AinaVT-LethalConfig-1.4.6
-  - TeamXiaolan-DawnLib-0.9.2
+  - TeamXiaolan-DawnLib-0.9.24
   - Evaisa-FixPluginTypesSerialization-1.1.4
-  <WebsiteUrl>k__BackingField: https://github.com/VELD-Dev/LC-BackroomsRenewed
+  <WebsiteUrl>k__BackingField: https://github.com/DiversenSato/LC-BackroomsRenewed
   <ModIcon>k__BackingField: {fileID: 21300000, guid: beaf4e94800fb7c8a8b98fb8630154f7,
     type: 3}

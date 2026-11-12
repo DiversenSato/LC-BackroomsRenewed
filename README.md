@@ -1,5 +1,11 @@
-# B#CKR##MS R#N#W#D
+# B#CKR##MS R#N#W#D — Fixed
 A new Backrooms mod for Lethal Company. Revamped. Reworked. Renewed.
+
+> **This is a bug-fix fork** of [Backrooms Renewed](https://github.com/VELD-Dev/LC-BackroomsRenewed) by **VELD-Dev**, maintained by **DiversenSato** since November 2026. All credit for the original mod goes to VELD-Dev and the people credited below.
+>
+> See the [CHANGELOG](https://github.com/DiversenSato/LC-BackroomsRenewed/blob/master/CHANGELOG.md) for what was changed. Source code: [DiversenSato/LC-BackroomsRenewed](https://github.com/DiversenSato/LC-BackroomsRenewed), licensed under GPL-3.0.
+>
+> **Don't install this alongside the original Backrooms Renewed.** Your settings from the original won't carry over.
 
 ## 📜 Explanation
 This mod is **not an interior** mod, it does not add new interior and **scrap does not spawn in the Backrooms**. **It is not a moon either**.  
