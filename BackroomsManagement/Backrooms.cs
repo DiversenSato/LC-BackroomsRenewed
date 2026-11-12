@@ -462,7 +462,9 @@ public class Backrooms : NetworkBehaviour
                 continue;
             }
             var exitGo = Instantiate(CurrentTheme.ExitPrefab, socket.position, socket.rotation);
-            exitGo.GetComponent<NetworkObject>().Spawn(true);
+            var exitNo = exitGo.GetComponent<NetworkObject>();
+            exitNo.Spawn(true);
+            _spawnedExits.Add(exitNo);
             Logger.LogDebug($"Spawned exit door at cell {exit.position} facing {exit.direction}");
         }
 
@@ -662,5 +664,24 @@ public class Backrooms : NetworkBehaviour
         {
             ambientMusicSource.Stop();
         }
+    }
+
+    private readonly List<NetworkObject> _spawnedExits = new();
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer)
+        {
+            if (Cells != null)
+                foreach (var cell in Cells)
+                    if (cell && cell.NetworkObject.IsSpawned)
+                        cell.NetworkObject.Despawn(true);
+
+            foreach (var exit in _spawnedExits)
+                if (exit && exit.IsSpawned)
+                    exit.Despawn(true);
+            _spawnedExits.Clear();
+        }
+        base.OnNetworkDespawn();
     }
 }
